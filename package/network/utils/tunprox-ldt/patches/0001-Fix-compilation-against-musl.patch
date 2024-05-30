@@ -1,0 +1,663 @@
+From 8ed9e4cc1844fb40ace85eb111353b93da575fb5 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ar=C4=B1n=C3=A7=20=C3=9CNAL?= <arinc.unal@arinc9.com>
+Date: Mon, 3 Jun 2024 16:46:56 +0300
+Subject: [PATCH] Fix compilation against musl
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Arınç ÜNAL <arinc.unal@arinc9.com>
+---
+ ext/frlib/lib/base/dlrt.h              |  2 +-
+ ext/frlib/lib/base/frassert.h          |  8 ++++++
+ ext/frlib/lib/base/frcontext.c         | 30 +++++++------------
+ ext/frlib/lib/base/frcontext.h         | 18 ++++++------
+ ext/frlib/lib/base/frfinish.c          |  2 +-
+ ext/frlib/lib/base/libdlstub.c         | 12 ++++----
+ ext/frlib/lib/base/mutex.c             |  4 +--
+ ext/frlib/lib/base/slog.c              | 40 +++++++++++++-------------
+ ext/frlib/lib/base/slog.h              |  8 +++---
+ ext/frlib/lib/buffer/bufcp.c           | 12 ++++----
+ ext/frlib/lib/include/base/dlrt.h      |  2 +-
+ ext/frlib/lib/include/base/frassert.h  |  8 ++++++
+ ext/frlib/lib/include/base/frcontext.h | 18 ++++++------
+ ext/frlib/lib/include/base/slog.h      |  8 +++---
+ ext/frlib/lib/include/netlink/fnl.h    | 11 +++++--
+ ext/frlib/lib/netlink/fnl.c            |  2 +-
+ ext/frlib/lib/netlink/fnl.h            | 11 +++++--
+ 17 files changed, 105 insertions(+), 91 deletions(-)
+
+diff --git a/ext/frlib/lib/base/dlrt.h b/ext/frlib/lib/base/dlrt.h
+index e30ccb2..cf7f747 100644
+--- a/ext/frlib/lib/base/dlrt.h
++++ b/ext/frlib/lib/base/dlrt.h
+@@ -36,7 +36,7 @@ extern "C" {
+ 
+ DLSTUB_MKSTUB_A2 (nanosleep, int, const struct timespec*, struct timespec*)
+ DLSTUB_MKSTUB_A2 (clock_gettime, int, clockid_t, struct timespec*)
+-DLSTUB_MKSTUB_A3 (shmopen, int, const char*, int, mode_t)
++DLSTUB_MKSTUB_A3 (shmopen, int, const char*, int, gid_t)
+ DLSTUB_MKSTUB_A1 (shmunlink, int, const char*)
+ 
+ 
+diff --git a/ext/frlib/lib/base/frassert.h b/ext/frlib/lib/base/frassert.h
+index a7782c5..10a2741 100644
+--- a/ext/frlib/lib/base/frassert.h
++++ b/ext/frlib/lib/base/frassert.h
+@@ -17,6 +17,14 @@
+  * by the Initial Developer. All Rights Reserved.
+  *
+  * ***** END LICENSE BLOCK ***** */
++#ifndef __GNUC_PREREQ
++  #if defined __GNUC__ && defined __GNUC_MINOR__
++    #define __GNUC_PREREQ(maj, min) \
++      ((__GNUC__ << 16) + __GNUC_MINOR__ >= ((maj) << 16) + (min))
++  #else
++    #define __GNUC_PREREQ(maj, min) 0
++  #endif
++#endif
+ 
+ #ifndef _R__FRLIB_LIB_BASE_ASSERT_H
+ #define _R__FRLIB_LIB_BASE_ASSERT_H
+diff --git a/ext/frlib/lib/base/frcontext.c b/ext/frlib/lib/base/frcontext.c
+index 565af31..e793e1f 100644
+--- a/ext/frlib/lib/base/frcontext.c
++++ b/ext/frlib/lib/base/frcontext.c
+@@ -21,33 +21,25 @@
+ 
+ #include "frcontext.h"
+ #include <errno.h>
+-#ifdef SunOS
+-extern int errno;
+-#endif
+ 
+-#if defined __UCLIBC__ || defined __ANDROID__
+-
+-
+-int
+-getcontext (ucp)
+-	ucontext_t	*ucp;
++int getcontext(frcontext_t *ucp)
+ {
+-	errno = ENOTSUP;
+-	return -1;
++    if (!ucp) return -1;
++    ucp->thread = pthread_self();
++    return setjmp(ucp->env);
+ }
+ 
+-int
+-setcontext (ucp)
+-	const ucontext_t	*ucp;
++int setcontext(const frcontext_t *ucp)
+ {
+-	errno = ENOTSUP;
+-	return -1;
++    if (!ucp) {
++        errno = EINVAL;
++        return -1;
++    }
++    longjmp(ucp->env, 1);
++    return 0;  // should not return if longjmp is successful
+ }
+ 
+ 
+-#endif	/* __UCLIBC__ */
+-
+-
+ 
+ 
+ 
+diff --git a/ext/frlib/lib/base/frcontext.h b/ext/frlib/lib/base/frcontext.h
+index 276a588..09ae8bf 100644
+--- a/ext/frlib/lib/base/frcontext.h
++++ b/ext/frlib/lib/base/frcontext.h
+@@ -21,18 +21,16 @@
+ #ifndef _R__FRLIB_BASE_FRCONTEXT_H
+ #define _R__FRLIB_BASE_FRCONTEXT_H
+ 
+-#include <stdlib.h>
+-#if 0 /* defined __UCLIBC__ */ /* || defined __ANDROID__ */ 
+-	/* android has the header but not the functions while uclibc lacks both */
+-typedef int ucontext_t;
+-#else
+-#include <ucontext.h>
+-#endif
+-
+-int getcontext(ucontext_t *ucp);
+-int setcontext(const ucontext_t *ucp);
++#include <pthread.h>
++#include <setjmp.h>
+ 
++typedef struct frcontext {
++    jmp_buf env;
++    pthread_t thread;
++} frcontext_t;
+ 
++int getcontext(frcontext_t *ucp);
++int setcontext(const frcontext_t *ucp);
+ 
+ #endif	/* _R__FRLIB_BASE_FRCONTEXT_H */
+ 
+diff --git a/ext/frlib/lib/base/frfinish.c b/ext/frlib/lib/base/frfinish.c
+index fe986d4..35ef736 100644
+--- a/ext/frlib/lib/base/frfinish.c
++++ b/ext/frlib/lib/base/frfinish.c
+@@ -226,7 +226,7 @@ doinit ()
+ {
+ 	if (isinit) return;
+ 	TLST_NEW(finishfuncs,struct func_t);
+-	on_exit (callonexit, NULL);
++	atexit (callonexit);
+ 	isinit = 1;
+ }
+ 
+diff --git a/ext/frlib/lib/base/libdlstub.c b/ext/frlib/lib/base/libdlstub.c
+index 69e5e0c..6fcbdd7 100644
+--- a/ext/frlib/lib/base/libdlstub.c
++++ b/ext/frlib/lib/base/libdlstub.c
+@@ -35,7 +35,7 @@ int dldump(const char*, const char*, int);
+ void *dlopen(const char *str, int x) {return NULL;}
+ void *dlsym(void *ptr, const char *str) {return NULL;}
+ int dlclose(void *ptr) {return 0;}
+-//#if !defined __USE_GNU && !defined __UCLIBC__
++//#if !defined _GNU_SOURCE && !defined __UCLIBC__
+ #ifdef __ANDROID__
+ const
+ #endif
+@@ -49,7 +49,7 @@ int dlinfo(void *ptr1, int x, void *ptr2);
+ int dlinfo(void *ptr1, int x, void *ptr2) {return 0;}
+ #endif
+ 
+-#ifdef __USE_GNU
++#ifdef _GNU_SOURCE
+ void *_dlopen(const char *str, int x);
+ void *_dlopen(const char *str, int x) {return NULL;}
+ void *_dlsym(void *ptr, const char *str);
+@@ -69,13 +69,13 @@ int _dlinfo(void *ptr1, int x, void *ptr2) {return 0;}
+ #endif
+ #endif
+ 
+-#if defined __USE_GNU && !defined __UCLIBC__
++#if defined _GNU_SOURCE && !defined __UCLIBC__
+ int dladdr(const void *ptr1, Dl_info *ptr2) {return 0;}
+ int _dladdr(const void *ptr1, Dl_info *ptr2);
+ int _dladdr(const void *ptr1, Dl_info *ptr2) {return 0;}
+-void *dlmopen(Lmid_t a, const char *str, int x) {return NULL;}
+-void *_dlmopen(Lmid_t a, const char *str, int x);
+-void *_dlmopen(Lmid_t a, const char *str, int x) {return NULL;}
++void *dlmopen(gid_t a, const char *str, int x) {return NULL;}
++void *_dlmopen(gid_t a, const char *str, int x);
++void *_dlmopen(gid_t a, const char *str, int x) {return NULL;}
+ #endif
+ 
+ 
+diff --git a/ext/frlib/lib/base/mutex.c b/ext/frlib/lib/base/mutex.c
+index cffe260..630bdd8 100644
+--- a/ext/frlib/lib/base/mutex.c
++++ b/ext/frlib/lib/base/mutex.c
+@@ -25,8 +25,8 @@
+ #include <unistd.h>
+ #include <sys/types.h>
+ #include <sys/ipc.h>
+-#ifndef __USE_GNU
+-# define __USE_GNU
++#ifndef _GNU_SOURCE
++# define _GNU_SOURCE
+ #endif
+ #include <sys/sem.h>
+ #include <errno.h>
+diff --git a/ext/frlib/lib/base/slog.c b/ext/frlib/lib/base/slog.c
+index a1879eb..78256f6 100644
+--- a/ext/frlib/lib/base/slog.c
++++ b/ext/frlib/lib/base/slog.c
+@@ -192,7 +192,7 @@ frlogf (
+ {
+ 	va_list		ap;
+ 	int			ret;
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	if (!fmt || !*fmt || level < 0) return RERR_PARAM;
+ 
+@@ -212,7 +212,7 @@ slogf (
+ {
+ 	va_list		ap;
+ 	int			ret;
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	if (!fmt || !*fmt || level < 0) return RERR_PARAM;
+ 
+@@ -232,7 +232,7 @@ smlogf (
+ {
+ 	va_list		ap;
+ 	int			ret;
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	if (!fmt || !*fmt || level < 0) return RERR_PARAM;
+ 
+@@ -252,7 +252,7 @@ shlogf (
+ {
+ 	va_list		ap;
+ 	int			ret;
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	if (!fmt || !*fmt || level < 0) return RERR_PARAM;
+ 
+@@ -275,7 +275,7 @@ sxlogf (
+ {
+ 	va_list		ap;
+ 	int			ret;
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	if (!fmt || !*fmt || level < 0) return RERR_PARAM;
+ 
+@@ -299,7 +299,7 @@ sxmlogf (
+ {
+ 	va_list		ap;
+ 	int			ret;
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	if (!fmt || !*fmt || level < 0) return RERR_PARAM;
+ 
+@@ -323,7 +323,7 @@ sxhlogf (
+ {
+ 	va_list		ap;
+ 	int			ret;
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	if (!fmt || !*fmt || level < 0) return RERR_PARAM;
+ 
+@@ -340,7 +340,7 @@ vslogf (level, fmt, ap)
+ 	const char	*fmt;
+ 	va_list		ap;
+ {
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	return vsxhlogf (0, level, NULL, 0, NULL, 
+ 					(getcontext(&ctx) == 0 ? &ctx : NULL), fmt, ap);
+@@ -354,7 +354,7 @@ vsmlogf (module, level, fmt, ap)
+ 	va_list		ap;
+ {
+ 	int			handle;
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	CF_MAY_READ;
+ 	handle = module2handle (module);
+@@ -385,7 +385,7 @@ vshlogf (handle, level, fmt, ap)
+ 	const char	*fmt;
+ 	va_list		ap;
+ {
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	return vsxhlogf (handle, level, NULL, 0, NULL, 
+ 					(getcontext(&ctx) == 0 ? &ctx : NULL), fmt, ap);
+@@ -400,7 +400,7 @@ vsxlogf (level, fname, lineno, funcname, ptr, fmt, ap)
+ 	va_list		ap;
+ 	void			*ptr;
+ {
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	if (!ptr && (getcontext (&ctx) == 0)) ptr = &ctx;
+ 	return vsxhlogf (0, level, fname, lineno, funcname, ptr, fmt, ap);
+@@ -417,7 +417,7 @@ vsxmlogf (module, level, fname, lineno, funcname, ptr, fmt, ap)
+ 	void			*ptr;
+ {
+ 	int			handle;
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	CF_MAY_READ;
+ 	if (!ptr && (getcontext (&ctx) == 0)) ptr = &ctx;
+@@ -444,7 +444,7 @@ vsxhlogf (handle, level, fname, lineno, funcname, ptr, fmt, ap)
+ 	va_list			ap2;
+ 	int				ret;
+ 	struct logconf	*lc;
+-	ucontext_t		ctx;
++	frcontext_t		ctx;
+ 
+ 	if (!fmt || !*fmt || level < 0) return RERR_PARAM;
+ 
+@@ -511,7 +511,7 @@ slogstr (level, msg)
+ 	int			level;
+ 	const char	*msg;
+ {
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	return do_shlogstr (0, level, ((getcontext (&ctx) == 0) ? &ctx : NULL), msg);
+ }
+@@ -523,7 +523,7 @@ smlogstr (module, level, msg)
+ 	const char	*msg;
+ {
+ 	int			handle;
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	CF_MAY_READ;
+ 	handle = module2handle (module);
+@@ -537,7 +537,7 @@ shlogstr (handle, level, msg)
+ 	int			level;
+ 	const char	*msg;
+ {
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	return do_shlogstr (handle, level, ((getcontext (&ctx) == 0) ? &ctx : NULL), msg);
+ }
+@@ -556,7 +556,7 @@ do_shlogstr (handle, level, ptr, msg)
+ 	int				ret, ret2;
+ 	int				origlevel, hasprtstderr=0;
+ 	struct logconf	*lc;
+-	ucontext_t		ctx;
++	frcontext_t		ctx;
+ 
+ 	if (!msg || !*msg || level < 0) return RERR_PARAM;
+ 	if (!ptr && (getcontext(&ctx)==0)) ptr = &ctx;
+@@ -667,7 +667,7 @@ sxlogstr (level, fname, lineno, funcname, ptr, msg)
+ 	int			lineno;
+ 	void			*ptr;
+ {
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	if (!ptr && (getcontext (&ctx) == 0)) ptr = &ctx;
+ 	return sxhlogstr (0, level, fname, lineno, funcname, ptr, msg);
+@@ -683,7 +683,7 @@ sxmlogstr (module, level, fname, lineno, funcname, ptr, msg)
+ 	void			*ptr;
+ {
+ 	int			handle;
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	CF_MAY_READ;
+ 	if (!ptr && (getcontext (&ctx) == 0)) ptr = &ctx;
+@@ -701,7 +701,7 @@ sxhlogstr (handle, level, fname, lineno, funcname, ptr, msg)
+ 	int			lineno;
+ 	void			*ptr;
+ {
+-	ucontext_t	ctx;
++	frcontext_t	ctx;
+ 
+ 	if (!ptr && (getcontext (&ctx) == 0)) ptr = &ctx;
+ 	if (!fname && !funcname) {
+diff --git a/ext/frlib/lib/base/slog.h b/ext/frlib/lib/base/slog.h
+index 38c78fe..9d84320 100644
+--- a/ext/frlib/lib/base/slog.h
++++ b/ext/frlib/lib/base/slog.h
+@@ -107,7 +107,7 @@ int sxhlogstr (int handle, int level, const char *fname, int lineno,
+ #include <fr/base/misc.h>
+ #define SLOGF(level,...) do { \
+ 			char			_r__errstr[96]; \
+-			ucontext_t	_r__ctx; \
++			frcontext_t	_r__ctx; \
+ 			*_r__errstr = 0; \
+ 			getcontext (&_r__ctx); \
+ 			sxhlogf (0, (level), __FILE__, __LINE__, \
+@@ -115,7 +115,7 @@ int sxhlogstr (int handle, int level, const char *fname, int lineno,
+ 		} while (0)
+ #define SMLOGF(module,level,...) do { \
+ 			char			_r__errstr[96]; \
+-			ucontext_t	_r__ctx; \
++			frcontext_t	_r__ctx; \
+ 			*_r__errstr = 0; \
+ 			getcontext (&_r__ctx); \
+ 			sxmlogf ((module), (level), __FILE__, \
+@@ -123,7 +123,7 @@ int sxhlogstr (int handle, int level, const char *fname, int lineno,
+ 		} while (0)
+ #define SHLOGF(handle,level,...) do { \
+ 			char			_r__errstr[96]; \
+-			ucontext_t	_r__ctx; \
++			frcontext_t	_r__ctx; \
+ 			*_r__errstr = 0; \
+ 			getcontext (&_r__ctx); \
+ 			sxhlogf ((handle), (level), __FILE__, \
+@@ -155,7 +155,7 @@ int frlogf (int level, const char *fmt, ...) __attribute__((format(printf, 2, 3)
+ 
+ #define FRLOGF(level,...) do { \
+ 			char			_r__errstr[96]; \
+-			ucontext_t	_r__ctx; \
++			frcontext_t	_r__ctx; \
+ 			*_r__errstr = 0; \
+ 			getcontext (&_r__ctx); \
+ 			sxhlogf (SLOG_H_FRLIB, (level), __FILE__, \
+diff --git a/ext/frlib/lib/buffer/bufcp.c b/ext/frlib/lib/buffer/bufcp.c
+index 6958a54..39000c6 100644
+--- a/ext/frlib/lib/buffer/bufcp.c
++++ b/ext/frlib/lib/buffer/bufcp.c
+@@ -35,7 +35,7 @@ bufcp (dest, src)
+ 	BUFFER 					help;
+ 	int						ret;
+ 	int						tid;
+-	u_int32_t				len, num;
++	uint32_t				len, num;
+ 	char						*str;
+ 
+ 	if (!dest || !src) return RERR_PARAM;
+@@ -155,7 +155,7 @@ bufmv (dest, src)
+ {
+ 	struct buffer	*pd, *ps;
+ 	int				otype, ret, tid;
+-	u_int32_t		len, num;
++	uint32_t		len, num;
+ 
+ 	if (!dest || !src) return RERR_PARAM;
+ 	if (dest == src) return RERR_PARAM;
+@@ -253,7 +253,7 @@ bufconvert (buf, type)
+ 	struct buf_memlist	*qm, *qmnext;
+ 	struct buf_blocklist	*qb, *qbnext;
+ 	int						ret, ret2;
+-	u_int32_t				len, origlen;
++	uint32_t				len, origlen;
+ 	char						*str;
+ 
+ 	if (!buf || type < BUF_TYPE_MIN || type > BUF_TYPE_MAX) return RERR_PARAM;
+@@ -393,7 +393,7 @@ buf_convempty (buf, type)
+ 	struct buffer	*buf;
+ 	int				type;
+ {
+-	u_int32_t	len;
++	uint32_t	len;
+ 
+ 	if (!buf || type < BUF_TYPE_MIN || type > BUF_TYPE_MAX) return RERR_PARAM;
+ 	if (buf->type == type) return RERR_OK;
+@@ -426,8 +426,8 @@ buf_convempty (buf, type)
+ 		break;
+ 	}
+ 	/* hack - but faster */
+-	len = (u_int32_t)(size_t)&(((struct buffer*)0)->next) - 
+-				(u_int32_t)(size_t)&(((struct buffer*)0)->dat);
++	len = (uint32_t)(size_t)&(((struct buffer*)0)->next) - 
++				(uint32_t)(size_t)&(((struct buffer*)0)->dat);
+ 	bzero (&(buf->dat), len);
+ 	buf->type = buf->otype = type;
+ 	return RERR_OK;
+diff --git a/ext/frlib/lib/include/base/dlrt.h b/ext/frlib/lib/include/base/dlrt.h
+index e30ccb2..cf7f747 100644
+--- a/ext/frlib/lib/include/base/dlrt.h
++++ b/ext/frlib/lib/include/base/dlrt.h
+@@ -36,7 +36,7 @@ extern "C" {
+ 
+ DLSTUB_MKSTUB_A2 (nanosleep, int, const struct timespec*, struct timespec*)
+ DLSTUB_MKSTUB_A2 (clock_gettime, int, clockid_t, struct timespec*)
+-DLSTUB_MKSTUB_A3 (shmopen, int, const char*, int, mode_t)
++DLSTUB_MKSTUB_A3 (shmopen, int, const char*, int, gid_t)
+ DLSTUB_MKSTUB_A1 (shmunlink, int, const char*)
+ 
+ 
+diff --git a/ext/frlib/lib/include/base/frassert.h b/ext/frlib/lib/include/base/frassert.h
+index a7782c5..10a2741 100644
+--- a/ext/frlib/lib/include/base/frassert.h
++++ b/ext/frlib/lib/include/base/frassert.h
+@@ -17,6 +17,14 @@
+  * by the Initial Developer. All Rights Reserved.
+  *
+  * ***** END LICENSE BLOCK ***** */
++#ifndef __GNUC_PREREQ
++  #if defined __GNUC__ && defined __GNUC_MINOR__
++    #define __GNUC_PREREQ(maj, min) \
++      ((__GNUC__ << 16) + __GNUC_MINOR__ >= ((maj) << 16) + (min))
++  #else
++    #define __GNUC_PREREQ(maj, min) 0
++  #endif
++#endif
+ 
+ #ifndef _R__FRLIB_LIB_BASE_ASSERT_H
+ #define _R__FRLIB_LIB_BASE_ASSERT_H
+diff --git a/ext/frlib/lib/include/base/frcontext.h b/ext/frlib/lib/include/base/frcontext.h
+index 276a588..09ae8bf 100644
+--- a/ext/frlib/lib/include/base/frcontext.h
++++ b/ext/frlib/lib/include/base/frcontext.h
+@@ -21,18 +21,16 @@
+ #ifndef _R__FRLIB_BASE_FRCONTEXT_H
+ #define _R__FRLIB_BASE_FRCONTEXT_H
+ 
+-#include <stdlib.h>
+-#if 0 /* defined __UCLIBC__ */ /* || defined __ANDROID__ */ 
+-	/* android has the header but not the functions while uclibc lacks both */
+-typedef int ucontext_t;
+-#else
+-#include <ucontext.h>
+-#endif
+-
+-int getcontext(ucontext_t *ucp);
+-int setcontext(const ucontext_t *ucp);
++#include <pthread.h>
++#include <setjmp.h>
+ 
++typedef struct frcontext {
++    jmp_buf env;
++    pthread_t thread;
++} frcontext_t;
+ 
++int getcontext(frcontext_t *ucp);
++int setcontext(const frcontext_t *ucp);
+ 
+ #endif	/* _R__FRLIB_BASE_FRCONTEXT_H */
+ 
+diff --git a/ext/frlib/lib/include/base/slog.h b/ext/frlib/lib/include/base/slog.h
+index 38c78fe..9d84320 100644
+--- a/ext/frlib/lib/include/base/slog.h
++++ b/ext/frlib/lib/include/base/slog.h
+@@ -107,7 +107,7 @@ int sxhlogstr (int handle, int level, const char *fname, int lineno,
+ #include <fr/base/misc.h>
+ #define SLOGF(level,...) do { \
+ 			char			_r__errstr[96]; \
+-			ucontext_t	_r__ctx; \
++			frcontext_t	_r__ctx; \
+ 			*_r__errstr = 0; \
+ 			getcontext (&_r__ctx); \
+ 			sxhlogf (0, (level), __FILE__, __LINE__, \
+@@ -115,7 +115,7 @@ int sxhlogstr (int handle, int level, const char *fname, int lineno,
+ 		} while (0)
+ #define SMLOGF(module,level,...) do { \
+ 			char			_r__errstr[96]; \
+-			ucontext_t	_r__ctx; \
++			frcontext_t	_r__ctx; \
+ 			*_r__errstr = 0; \
+ 			getcontext (&_r__ctx); \
+ 			sxmlogf ((module), (level), __FILE__, \
+@@ -123,7 +123,7 @@ int sxhlogstr (int handle, int level, const char *fname, int lineno,
+ 		} while (0)
+ #define SHLOGF(handle,level,...) do { \
+ 			char			_r__errstr[96]; \
+-			ucontext_t	_r__ctx; \
++			frcontext_t	_r__ctx; \
+ 			*_r__errstr = 0; \
+ 			getcontext (&_r__ctx); \
+ 			sxhlogf ((handle), (level), __FILE__, \
+@@ -155,7 +155,7 @@ int frlogf (int level, const char *fmt, ...) __attribute__((format(printf, 2, 3)
+ 
+ #define FRLOGF(level,...) do { \
+ 			char			_r__errstr[96]; \
+-			ucontext_t	_r__ctx; \
++			frcontext_t	_r__ctx; \
+ 			*_r__errstr = 0; \
+ 			getcontext (&_r__ctx); \
+ 			sxhlogf (SLOG_H_FRLIB, (level), __FILE__, \
+diff --git a/ext/frlib/lib/include/netlink/fnl.h b/ext/frlib/lib/include/netlink/fnl.h
+index c75bba1..4fb24db 100644
+--- a/ext/frlib/lib/include/netlink/fnl.h
++++ b/ext/frlib/lib/include/netlink/fnl.h
+@@ -21,9 +21,15 @@
+ #ifndef _R__FRLIB_LIB_NETLINK_FNL_H
+ #define _R__FRLIB_LIB_NETLINK_FNL_H
+ 
+-#ifndef __USE_GNU
+-#define __USE_GNU
++#ifndef _GNU_SOURCE
++#define _GNU_SOURCE
+ #endif
++
++#ifndef SCM_CREDENTIALS
++#define SCM_CREDENTIALS 0x02
++#endif
++
++
+ #include <sys/socket.h>
+ #include <linux/netlink.h>
+ #include <linux/genetlink.h>
+@@ -34,7 +40,6 @@
+ extern "C" {
+ #endif
+ 
+-struct ucred;
+ 
+ /* flags */
+ #define FNL_F_NONE		0x00
+diff --git a/ext/frlib/lib/netlink/fnl.c b/ext/frlib/lib/netlink/fnl.c
+index 3cfda09..120b24e 100644
+--- a/ext/frlib/lib/netlink/fnl.c
++++ b/ext/frlib/lib/netlink/fnl.c
+@@ -27,7 +27,7 @@
+ #include <errno.h>
+ #include <sys/poll.h>
+ #include <sys/stat.h>
+-#define __USE_GNU
++#define _GNU_SOURCE
+ #include <sys/socket.h>
+ #include <sys/un.h>
+ #include <arpa/inet.h>
+diff --git a/ext/frlib/lib/netlink/fnl.h b/ext/frlib/lib/netlink/fnl.h
+index c75bba1..4fb24db 100644
+--- a/ext/frlib/lib/netlink/fnl.h
++++ b/ext/frlib/lib/netlink/fnl.h
+@@ -21,9 +21,15 @@
+ #ifndef _R__FRLIB_LIB_NETLINK_FNL_H
+ #define _R__FRLIB_LIB_NETLINK_FNL_H
+ 
+-#ifndef __USE_GNU
+-#define __USE_GNU
++#ifndef _GNU_SOURCE
++#define _GNU_SOURCE
+ #endif
++
++#ifndef SCM_CREDENTIALS
++#define SCM_CREDENTIALS 0x02
++#endif
++
++
+ #include <sys/socket.h>
+ #include <linux/netlink.h>
+ #include <linux/genetlink.h>
+@@ -34,7 +40,6 @@
+ extern "C" {
+ #endif
+ 
+-struct ucred;
+ 
+ /* flags */
+ #define FNL_F_NONE		0x00
+-- 
+2.43.0
+
