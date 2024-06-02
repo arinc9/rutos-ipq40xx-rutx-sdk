@@ -75,7 +75,7 @@ define Build/InstallGPL
 	$(if $(CONFIG_GPL_INCLUDE_WEB_SOURCES), \
 		$(Build/InstallGPL/Default) , \
 		$(INSTALL_DIR) $(PKG_GPL_BUILD_DIR)/files; \
-		if [[ -d $(PKG_BUILD_DIR)/files ]] && [[ "$$(ls -A $(PKG_BUILD_DIR)/files)" ]]; then \
+		if [[ -d $(PKG_BUILD_DIR)/files ]] && [[ "$$(ls -A -I .gitignore $(PKG_BUILD_DIR)/files)" ]]; then \
 			$(CP) $(PKG_BUILD_DIR)/files/* $(PKG_GPL_BUILD_DIR)/files ;\
 		fi ; \
 		$(if $(findstring m,$(CONFIG_PACKAGE_$(PKG_NAME))), \
@@ -86,8 +86,8 @@ define Build/InstallGPL
 endef
 
 define Package/$(PKG_NAME)/install/Default
-	if [[ -d $(PKG_BUILD_DIR)/files ]] && [[ "$$$$(ls -A $(PKG_BUILD_DIR)/files)" ]]; then $(CP) $(PKG_BUILD_DIR)/files/* $(1) ; fi
-	if [[ -d "$(PKG_BUILD_DIR)/dest" ]] && [[ "$$$$(ls -A $(PKG_BUILD_DIR)/dest)" ]]; then \
+	if [[ -d $(PKG_BUILD_DIR)/files ]] && [[ "$$$$(ls -A -I .gitignore $(PKG_BUILD_DIR)/files)" ]]; then $(CP) $(PKG_BUILD_DIR)/files/* $(1) ; fi
+	if [[ -d "$(PKG_BUILD_DIR)/dest" ]] && [[ "$$$$(ls -A -I .gitignore $(PKG_BUILD_DIR)/dest)" ]]; then \
 		$(INSTALL_DIR) $(1)/www/views; \
 		$(CP) $(PKG_BUILD_DIR)/dest/* $(1)/www/views; \
 	fi
