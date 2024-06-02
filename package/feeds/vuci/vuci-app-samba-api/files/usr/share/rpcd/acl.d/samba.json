@@ -1,0 +1,34 @@
+{
+  "services/usb_tools/samba/general": {
+    "description": "network share general",
+    "read": {
+      "api": [
+        "/samba/global/*",
+        "/samba/shares/*",
+        "/usb_tools/mount/options/*",
+        "/interfaces/config/*",
+        "/samba/users/config/*",
+        "/samba/status/*"
+      ]
+    },
+    "write": {
+      "api": [
+        "/samba/global/*",
+        "/samba/shares/*"
+      ]
+    }
+  },
+  "services/usb_tools/samba/users": {
+    "description": "network share users",
+    "read": {
+      "api": [
+        "/samba/users/*"
+      ]
+    },
+    "write": {
+      "api": [
+        "/samba/users/*"
+      ]
+    }
+  }
+}

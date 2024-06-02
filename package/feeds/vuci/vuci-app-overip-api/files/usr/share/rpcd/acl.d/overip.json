@@ -1,0 +1,18 @@
+{
+	"services/serial_utilities/overip": {
+		"description": "overip configuration",
+		"read": {
+			"api": [
+				"/overip/*",
+				"/serial/status/*",
+				"/system/device/status/*",
+				"/firewall/zones/*"
+			]
+		},
+		"write": {
+			"api": [
+				"/overip/*"
+			]
+		}
+	}
+}

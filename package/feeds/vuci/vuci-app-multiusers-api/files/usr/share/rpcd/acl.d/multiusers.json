@@ -1,0 +1,22 @@
+
+{
+	"system/admin/multiusers/change_password": {
+		"description": "change password page",
+		"read": {
+			"api": ["/users/config/*"]
+		},
+		"write": {
+			"api": ["/users/config/*"]
+		}
+	},
+
+	"system/admin/multiusers/users_configuration": {
+		"description": "multiusers configuration",
+		"read": {
+			"api": ["/users/groups/*", "/users/config/*", "/users/acls/*"]
+		},
+		"write": {
+			"api": ["/users/groups/*", "/users/config/*", "/users/acls/*"]
+		}
+	}
+}

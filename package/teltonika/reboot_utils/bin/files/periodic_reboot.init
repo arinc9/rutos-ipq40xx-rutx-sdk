@@ -1,0 +1,28 @@
+#!/bin/sh /etc/rc.common
+
+START=54
+STOP=10
+USE_PROCD=1
+
+CRONTAB_FILE='/etc/crontabs/root'
+IDENTIFYING_STRING='# periodic_reboot'
+
+start_service() {
+    sed -i "/$IDENTIFYING_STRING/d" "$CRONTAB_FILE" 2>/dev/null
+    /etc/reboot_utils/periodic_reboot_init.sh &
+}
+
+stop_service() {
+    pid=$(pgrep -f "/etc/reboot_utils/periodic_reboot_init.sh")
+    [ "$pid" != "" ] && kill -9 "$pid"
+    sed -i "/$IDENTIFYING_STRING/d" "$CRONTAB_FILE"
+}
+
+service_triggers() {
+    procd_add_reload_trigger "periodic_reboot"
+}
+
+reload_service(){
+    stop
+    start
+}

@@ -1,0 +1,86 @@
+#include "qcom-ipq4018-rutx-STM32.dtsi"
+
+/ {
+	model = "RUTX10 STM32";
+
+	soc {
+		gpio-export {
+			compatible = "gpio-export";
+			#size-cells = <0>;
+
+			gpio_out_1 {
+				gpio-export,name = "gpio23";
+				gpio-export,output = <0>;
+				gpio-export,direction_may_change;
+				gpios = <&stm32_io 23 GPIO_ACTIVE_HIGH>;
+			};
+
+			gpio_in_1 {
+				gpio-export,name = "gpio24";
+				gpio-export,input = <0>;
+				gpio-export,direction_may_change;
+				gpios = <&stm32_io 24 GPIO_ACTIVE_LOW>;
+			};
+		};
+
+		leds {
+			compatible = "gpio-leds";
+
+			led_wifi_24 {
+				label = "wifi_gen_2";
+				gpios = <&stm32_io 19 GPIO_ACTIVE_HIGH>;
+			};
+
+			led_wifi_50 {
+				label = "wifi_gen_5";
+				gpios = <&stm32_io 18 GPIO_ACTIVE_HIGH>;
+			};
+		};
+	};
+
+	tlt_gpios { // Modify according to wiki page "DTS syntax with Libgpiod changes"
+		gpiochip_info {
+			hw_0 {
+				hwver = <0>;
+				gpiochip_count = <2>;
+
+				gpiochip_0 = <100>; // Built-in
+				gpiochip_1 = <37>;  // STM32 expander
+			};
+		};
+
+		ioman {
+			GPIO_123 {
+				compatible_versions = <0 8>;
+				line_name = "GPIO_OUT_1";
+			};
+			GPIO_124 {
+				compatible_versions = <0 8>;
+				line_name = "GPIO_IN_1";
+				active_low;
+			};
+		};
+
+		ledman {
+			GPIO_119 {
+				compatible_versions = <0 8>;
+				line_name = "LED_WIFI_24";
+			};
+			GPIO_118 {
+				compatible_versions = <0 8>;
+				line_name = "LED_WIFI_50";
+			};
+		};
+	};
+};
+
+&mnfinfo {
+	/delete-node/ simpin1;
+	/delete-node/ simpin2;
+	/delete-node/ simpin3;
+	/delete-node/ simpin4;
+
+	sim_count {
+		default =  "0";
+	};
+};

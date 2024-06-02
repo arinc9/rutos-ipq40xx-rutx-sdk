@@ -1,0 +1,30 @@
+{
+	"system/admin/datetime/general": {
+		"description": "ntp general configuration",
+		"read": {
+			"api": [
+				"/date_time/ntp/*"
+			]
+		},
+		"write": {
+			"api": [
+				"/date_time/ntp/*"
+			]
+		}
+	},
+	"system/admin/datetime/ntp": {
+		"description": "ntp configuration",
+		"read": {
+			"api": [
+				"/date_time/ntp/*",
+				"/modems/status_basic/*",
+				"/date_time/ntpd/config/general/*"
+			]
+		},
+		"write": {
+			"api": [
+				"/date_time/ntp/*"
+			]
+		}
+	}
+}

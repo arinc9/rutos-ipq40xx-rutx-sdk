@@ -1,0 +1,24 @@
+{
+	"network/routes/dynamic_routes/proto_bgp": {
+		"description": "dynamic routes bgp configuration",
+		"read": {
+			"api": [
+				"/bgp/*"
+			]
+		},
+		"write": {
+			"api": [
+				"/bgp/*"
+			]
+		}
+	},
+
+	"status/routes/dynamic/bgp": {
+		"description": "bgp routes",
+		"read": {
+			"api": [
+				"/bgp/*"
+			]
+		}
+	}
+}

@@ -1,0 +1,26 @@
+{
+	"system/maintenance/auto_reboot/ping_reboot": {
+		"description": "ping reboot configuration",
+		"read": {
+			"api": [
+				"/auto_reboot/ping_wget/*",
+				"/modems/status_basic/*"
+			]
+		},
+		"write": {
+			"api": ["/auto_reboot/ping_wget/*"]
+		}
+	},
+	"system/maintenance/auto_reboot/reboot_scheduler": {
+		"description": "reboot scheduler configuration",
+		"read": {
+			"api": [
+				"/auto_reboot/scheduler/*",
+				"/modems/status_basic/*"
+			]
+		},
+		"write": {
+			"api": ["/auto_reboot/scheduler/*"]
+		}
+	}
+}

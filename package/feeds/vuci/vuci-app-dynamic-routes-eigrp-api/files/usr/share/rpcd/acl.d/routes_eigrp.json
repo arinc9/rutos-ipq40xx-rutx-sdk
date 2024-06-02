@@ -1,0 +1,24 @@
+{
+	"network/routes/dynamic_routes/proto_eigrp": {
+		"description": "dynamic eigrp routes configuration",
+		"read": {
+			"api": [
+				"/eigrp/*"
+			]
+		},
+		"write": {
+			"api": [
+				"/eigrp/*"
+			]
+		}
+	},
+
+	"status/routes/dynamic/eigrp": {
+		"description": "eigrp routes",
+		"read": {
+			"api": [
+				"/eigrp/*"
+			]
+		}
+	}
+}

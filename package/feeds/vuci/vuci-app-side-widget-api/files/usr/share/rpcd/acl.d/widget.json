@@ -1,0 +1,21 @@
+{
+	"status/widget": {
+		"description": "overview page",
+		"read": {
+			"api": [
+				"/widget/*",
+				"/bluetooth/config/general/*",
+				"/wireless/interfaces/*",
+				"/interfaces/config/*",
+				"/rms/*",
+				"/system/device/usage/*",
+				"/modems/*"
+			]
+		},
+		"write": {
+			"api": [
+				"/widget/*"
+			]
+		}
+	}
+}

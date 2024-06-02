@@ -1,0 +1,33 @@
+#!/bin/sh /etc/rc.common
+
+START=95
+STOP=10
+USE_PROCD=1
+
+CRONTAB_FILE=/etc/crontabs/root
+
+clear_crontab() {
+    sed -i '/sbin\/ping_reboot/d' ${CRONTAB_FILE} 2>/dev/null
+}
+
+start_service() {
+    clear_crontab
+    /etc/reboot_utils/ping_reboot_init.sh &
+}
+
+stop_service() {
+    init_pid=$(pgrep -f "/etc/reboot_utils/ping_reboot_init.sh")
+    [ "$init_pid" != "" ] && kill -9 "$init_pid"
+
+    pid_list=$(pgrep -f "/usr/sbin/ping_reboot.sh")
+    for pid in $pid_list; do
+        kill -9 "$pid"
+    done
+
+    clear_crontab
+    /etc/init.d/cron restart
+}
+
+service_triggers() {
+    procd_add_reload_trigger "ping_reboot"
+}

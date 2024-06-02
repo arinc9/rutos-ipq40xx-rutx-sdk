@@ -1,0 +1,21 @@
+{
+	"services/dlms": {
+		"description": "dlms configuration",
+		"read": {
+			"api": [
+				"/dlms/client*",
+				"/dlms/connections/*",
+				"/dlms/cosem_group/*",
+				"/dlms/devices/*"
+			]
+		},
+		"write": {
+			"api": [
+				"/dlms/client*",
+				"/dlms/connections/*",
+				"/dlms/cosem_group/*",
+				"/dlms/devices/*"
+			]
+		}
+	}
+}

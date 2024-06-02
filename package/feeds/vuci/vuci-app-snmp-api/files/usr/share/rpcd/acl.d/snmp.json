@@ -1,0 +1,64 @@
+{
+  "services/snmp/snmp_settings": {
+    "description": "snmp settings",
+    "read": {
+      "api": [
+        "/snmp/agent/*",
+        "/snmp/system/*",
+        "/profinet/status"
+      ]
+    },
+    "write": {
+      "api": [
+        "/snmp/agent/*",
+        "/snmp/system/*"
+      ]
+    }
+  },
+  "services/snmp/snmpv3": {
+    "description": "snmp v3 users",
+    "read": {
+      "api": [
+        "/snmp/users/*",
+        "/profinet/status"
+      ]
+    },
+    "write": {
+      "api": [
+        "/snmp/users/*"
+      ]
+    }
+  },
+  "services/snmp/community": {
+    "description": "snmp communities",
+    "read": {
+      "api": [
+        "/snmp/communities/*",
+        "/snmp/communities_v6/*",
+        "/profinet/status"
+      ]
+    },
+    "write": {
+      "api": [
+        "/snmp/communities/*",
+        "/snmp/communities_v6/*"
+      ]
+    }
+  },
+  "services/snmp/traps": {
+    "description": "trap settings",
+    "read": {
+      "api": [
+        "/snmp/trap/*",
+        "/io/*",
+        "/modems/status_basic/*",
+        "/events_reporting/options/*"
+      ]
+    },
+    "write": {
+      "api": [
+        "/snmp/trap/*"
+      ]
+    }
+  }
+}

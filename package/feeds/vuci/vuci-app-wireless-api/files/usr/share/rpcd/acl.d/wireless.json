@@ -1,0 +1,43 @@
+{
+	"network/wireless/ssids": {
+		"description": "wireless config",
+		"read": {
+			"api": [
+				"/wireless/*",
+				"/interfaces/config/*",
+				"/certificates/config/*",
+				"/firewall/zones/config/*"
+			]
+		},
+		"write": {
+			"api": [
+				"/wireless/*"
+			]
+		}
+	},
+	"network/wireless/radio": {
+		"description": "wireless device config",
+		"read": {
+			"api": [
+				"/wireless/*"
+			]
+		},
+		"write": {
+			"api": [
+				"/wireless/*"
+			]
+		}
+	},
+	"network/wireless/scan": {
+		"read": {
+			"api": [
+				"/wireless/*"
+			]
+		},
+		"write": {
+			"api": [
+				"/wireless/*"
+			]
+		}
+	}
+}

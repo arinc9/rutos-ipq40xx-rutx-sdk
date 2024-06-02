@@ -1,0 +1,162 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2010 Jo-Philipp Wich
+
+START=14
+
+USE_PROCD=1
+
+UHTTPD_BIN="/usr/sbin/uhttpd"
+OPENSSL_BIN="/usr/bin/openssl"
+
+append_arg() {
+	local cfg="$1"
+	local var="$2"
+	local opt="$3"
+	local def="$4"
+	local val
+
+	config_get val "$cfg" "$var"
+	[ -n "$val" ] || [ -n "$def" ] && procd_append_param command "$opt" "${val:-$def}"
+}
+
+append_bool() {
+	local cfg="$1"
+	local var="$2"
+	local opt="$3"
+	local def="$4"
+	local val
+
+	config_get_bool val "$cfg" "$var" "$def"
+	[ "$val" = 1 ] && procd_append_param command "$opt"
+}
+
+generate_keys() {
+	local cfg="$1"
+	local crt="$2"
+	local key="$3"
+	local days bits country state location commonname key_type ec_curve
+
+	config_get days       "$cfg" days
+	config_get bits       "$cfg" bits
+	config_get country    "$cfg" country
+	config_get state      "$cfg" state
+	config_get location   "$cfg" location
+	config_get commonname "$cfg" commonname
+	config_get key_type   "$cfg" key_type
+	config_get ec_curve   "$cfg" ec_curve
+
+	local KEY_OPTS="rsa:${bits:-2048}"
+	local UNIQUEID=$(dd if=/dev/urandom bs=1 count=4 2>/dev/null | hexdump -e '1/1 "%02x"')
+	[ "$key_type" = "ec" ] && KEY_OPTS="ec -pkeyopt ec_paramgen_curve:${ec_curve:-P-256}"
+	[ -x "$OPENSSL_BIN" ] && {
+		local macaddr="$(mnf_info -m)"
+		$OPENSSL_BIN req -x509 -sha256 -outform der -nodes \
+			-days ${days:-730} -newkey ${KEY_OPTS} -keyout "${key}.new" -out "${crt}.new" \
+			-subj /C="${country:-ZZ}"/ST="${state:-Somewhere}"/L="${location:-Unknown}"/O="${commonname:-OpenWrt}$UNIQUEID"/CN="${commonname:-OpenWrt}" \
+			-addext "subjectAltName=DNS:Teltonika${macaddr}" &>/dev/null
+		sync
+		mv "${key}.new" "${key}"
+		mv "${crt}.new" "${crt}"
+	}
+}
+
+append_lua_prefix() {
+	local v="$1"
+	local prefix="${v%%=*}"
+	local handler="${v#*=}"
+
+	if [ "$prefix" != "$handler" ] && [ -n "$prefix" ] && [ -f "$handler" ]; then
+		procd_append_param command -l "$prefix" -L "$handler"
+	else
+		echo "Skipping invalid Lua prefix \"$v\"" >&2
+	fi
+}
+
+start_instance()
+{
+	local disabled enb_http enb_https
+
+	local cfg="$1"
+	config_get disabled "$cfg" disabled "0"
+	[ "$disabled" = "1" ] && return
+
+	procd_open_instance
+	procd_set_param respawn 0 5 0
+	procd_set_param stderr 1
+	procd_set_param command "$UHTTPD_BIN" -f
+
+	[ "$cfg" = "main" ] && procd_append_param command -b
+
+	append_arg "$cfg" home "-h"
+	append_arg "$cfg" config "-c"
+	append_arg "$cfg" cgi_prefix "-x"
+	[ -f /usr/lib/uhttpd_lua.so ] && {
+		local len
+		config_get len "$cfg" lua_prefix_LENGTH
+
+		if [ -n "$len" ]; then
+			config_list_foreach "$cfg" lua_prefix append_lua_prefix
+		else
+			config_get prefix "$cfg" lua_prefix
+			config_get handler "$cfg" lua_handler
+			append_lua_prefix "$prefix=$handler"
+		fi
+	}
+	[ -f /usr/lib/uhttpd_ubus.so ] && {
+		append_arg "$cfg" ubus_prefix "-u"
+		append_arg "$cfg" ubus_socket "-U"
+		append_bool "$cfg" ubus_cors "-X" 0
+	}
+	append_arg "$cfg" script_timeout "-t"
+	append_arg "$cfg" network_timeout "-T"
+	append_arg "$cfg" http_keepalive "-k"
+	append_arg "$cfg" tcp_keepalive "-A"
+	append_arg "$cfg" index_page "-I"
+	append_arg "$cfg" error_page "-E"
+	append_arg "$cfg" max_requests "-n" 3
+	append_arg "$cfg" max_connections "-N"
+
+	append_bool "$cfg" no_ubusauth "-a" 0
+	append_bool "$cfg" no_symlinks "-S" 0
+	append_bool "$cfg" no_dirlists "-D" 0
+	append_bool "$cfg" rfc1918_filter "-R" 0
+
+	config_get enb_http "$cfg" enable_http "1"
+	[ "$enb_http" = "1" ] && append_arg "$cfg" listen_http "-p"
+
+	config_get enb_https "$cfg" enable_https
+	[ -f /lib/libustream-ssl.so ] && [ "$enb_https" = "1" ] && {
+		local cert key
+		config_get cert 	"$cfg" cert /etc/uhttpd.crt
+		config_get cert_key "$cfg" key	/etc/uhttpd.key
+
+		[ ! -s "$cert" ] || [ ! -s "$cert_key" ] \
+			&& generate_keys "defaults" "$cert" "$cert_key"
+
+		[ -f "$cert" ] && [ -f "$cert_key" ] && {
+			procd_append_param command -C "$cert"
+			procd_append_param command -K "$cert_key"
+
+			local https
+			config_get https "$cfg" listen_https
+			procd_append_param command -s "$https"
+			procd_add_mdns "https" "tcp" "$https"
+
+			procd_set_param file "$cert" "$cert_key"
+		}
+
+		append_bool "$cfg" redirect_https "-q" 0
+	}
+
+	procd_close_instance
+}
+
+service_triggers()
+{
+	procd_add_reload_trigger "uhttpd"
+}
+
+start_service() {
+	config_load uhttpd
+	config_foreach start_instance uhttpd
+}

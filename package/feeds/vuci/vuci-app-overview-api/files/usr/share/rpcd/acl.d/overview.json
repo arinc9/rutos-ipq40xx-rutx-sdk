@@ -1,0 +1,35 @@
+{
+	"status/overview": {
+		"description": "overview page",
+		"read": {
+			"api": [
+				"/system/device/usage/*",
+				"/modems/status/*",
+				"/sim_cards/status/*",
+				"/interfaces/status/*",
+				"/interfaces/config/*",
+				"/interfaces/stats/*",
+				"/data_limit/*",
+				"/failover/interfaces/config/*",
+				"/failover/status/*",
+				"/port_based_vlan/config/*",
+				"/interface_based_vlan/*",
+				"/rms/*",
+				"/access_control/webui/status/*",
+				"/hotspot/status/*",
+				"/vrrp/status/*",
+				"/vrrp/config/*",
+				"/openvpn/status/*",
+				"/wireless/interfaces/*",
+				"/events_log/config/system/*",
+				"/events_log/config/network/*",
+				"/overview/*"
+			]
+		},
+		"write": {
+			"api": [
+				"/overview/*"
+			]
+		}
+	}
+}

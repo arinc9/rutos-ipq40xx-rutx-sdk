@@ -1,0 +1,21 @@
+{
+    "services/usb_tools/general": {
+        "description": "usb tools configuration",
+        "read": {
+            "api": [
+                "/usb_tools/*"
+            ]
+        },
+        "write": {
+            "api": [
+                "/usb_tools/*",
+                "/system/actions/reboot/*"
+            ],
+            "ubus": {
+                "vuci.system": [
+                    "reboot"
+                ]
+            }
+        }
+    }
+}

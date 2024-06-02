@@ -1,0 +1,11 @@
+{
+  "status/realtime/mobile_usage": {
+    "description": "mobile usage",
+    "read": {
+      "api": ["/modems/*", "/data_usage/*", "/sim_cards/*"],
+      "ubus": {
+        "vuci.system": ["lucibwc"]
+      }
+    }
+  }
+}
