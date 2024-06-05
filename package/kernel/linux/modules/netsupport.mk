@@ -1297,3 +1297,47 @@ define KernelPackage/wireguard/description
 endef
 
 $(eval $(call KernelPackage,wireguard))
+
+define KernelPackage/mpdccp
+  SUBMENU:=$(NETWORK_SUPPORT_MENU)
+  TITLE:=mp-dccp kernel module
+  KCONFIG:= \
+	  CONFIG_IP_DCCP \
+    CONFIG_IP_DCCP_CCID7=n \
+    CONFIG_IP_MPDCCP \
+    CONFIG_MPDCCP_SCHED_SRTT \
+    CONFIG_MPDCCP_SCHED_ROUNDROBIN \
+    CONFIG_MPDCCP_SCHED_REDUNDANT \
+    CONFIG_MPDCCP_STATS=y
+  FILES:= \
+    $(LINUX_DIR)/net/dccp/dccp.ko \
+    $(LINUX_DIR)/net/dccp/dccp_ipv4.ko \
+    $(LINUX_DIR)/net/dccp/dccp_ipv6.ko \
+    $(LINUX_DIR)/net/dccp/mpdccp.ko \
+    $(LINUX_DIR)/net/dccp/mpdccplink.ko \
+    $(LINUX_DIR)/net/dccp/scheduler/mpdccp_sched_srtt.ko \
+    $(LINUX_DIR)/net/dccp/scheduler/mpdccp_sched_rr.ko \
+    $(LINUX_DIR)/net/dccp/scheduler/mpdccp_sched_redundant.ko
+endef
+
+$(eval $(call KernelPackage,mpdccp))
+
+define KernelPackage/tunprox-ldt
+  SUBMENU:=$(NETWORK_SUPPORT_MENU)
+  TITLE:=tunprox-ldt kernel module
+  DEPENDS:=kmod-mpdccp
+  KCONFIG:= CONFIG_LDT
+  FILES:=$(LINUX_DIR)/net/ldt/ldt.ko
+endef
+
+$(eval $(call KernelPackage,tunprox-ldt))
+
+define KernelPackage/udccp
+  SUBMENU:=$(NETWORK_SUPPORT_MENU)
+  TITLE:=u-dccp kernel module
+  KCONFIG:= \
+	  CONFIG_UDCCP
+  FILES:=$(LINUX_DIR)/net/udccp/dccp_udp_converter.ko
+endef
+
+$(eval $(call KernelPackage,udccp))
